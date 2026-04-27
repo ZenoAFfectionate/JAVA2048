@@ -1,8 +1,5 @@
 # 2048 — Java 课程设计
 
-> **华南理工大学 · JAVA 程序设计课程大作业**
-> Author: Liang Pang | Student ID: 202030100266
-
 ---
 
 ## 项目背景
