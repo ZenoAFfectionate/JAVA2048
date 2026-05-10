@@ -191,7 +191,15 @@ public class GameView extends JPanel implements ActionListener {
         // 缓存的 FontMetrics，每次 paintComponent 时更新
         private transient FontMetrics[] cachedMetrics = null;
 
+        // 方向常量 (动画追踪用)
+        private static final int DIR_UP    = 0;
+        private static final int DIR_DOWN  = 1;
+        private static final int DIR_LEFT  = 2;
+        private static final int DIR_RIGHT = 3;
+
         final Grid[][] grids = new Grid[ROWS][COLS];
+        final AnimationEngine animEngine = new AnimationEngine();
+        int pendingKeyCode; // 0 = none
 
         GameBoard() {
             restart();
@@ -213,6 +221,14 @@ public class GameView extends JPanel implements ActionListener {
         }
 
         // ---- 棋盘操作 ----
+
+        private int[][] saveValues() {
+            int[][] vals = new int[ROWS][COLS];
+            for (int r = 0; r < ROWS; r++)
+                for (int c = 0; c < COLS; c++)
+                    vals[r][c] = grids[r][c].value;
+            return vals;
+        }
 
         private void clearMerge() {
             for (Grid[] row : grids)
@@ -247,9 +263,60 @@ public class GameView extends JPanel implements ActionListener {
             grids[cell[0]][cell[1]].value = RNG.nextDouble() < 0.9 ? 2 : 4;
         }
 
+        // ---- 动画构建 ----
+
+        /** 对比 pre/post 快照，为每个移动过的 tile 创建 SLIDE 动画 */
+        private void buildSlideAnims(int[][] preVals, int dir) {
+            boolean[][] consumed = new boolean[ROWS][COLS];
+
+            for (int r = 0; r < ROWS; r++) {
+                for (int c = 0; c < COLS; c++) {
+                    int postVal = grids[r][c].value;
+                    if (postVal == 0) continue;
+                    if (grids[r][c].isMerged()) continue;
+                    if (preVals[r][c] == postVal) continue; // 没有移动
+
+                    if (dir == DIR_UP || dir == DIR_DOWN) {
+                        int startR = (dir == DIR_UP) ? ROWS - 1 : 0;
+                        int endR   = (dir == DIR_UP) ? -1 : ROWS;
+                        int step   = (dir == DIR_UP) ? -1 : 1;
+                        for (int pr = startR; pr != endR; pr += step) {
+                            if (consumed[pr][c]) continue;
+                            if (preVals[pr][c] == postVal) {
+                                animEngine.addSlide(pr, c, r, c, postVal);
+                                consumed[pr][c] = true;
+                                break;
+                            }
+                        }
+                    } else {
+                        int startC = (dir == DIR_LEFT) ? COLS - 1 : 0;
+                        int endC   = (dir == DIR_LEFT) ? -1 : COLS;
+                        int step   = (dir == DIR_LEFT) ? -1 : 1;
+                        for (int pc = startC; pc != endC; pc += step) {
+                            if (consumed[r][pc]) continue;
+                            if (preVals[r][pc] == postVal) {
+                                animEngine.addSlide(r, pc, r, c, postVal);
+                                consumed[r][pc] = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        /** 为合并位置创建 MERGE 动画 */
+        private void buildMergeAnims() {
+            for (int r = 0; r < ROWS; r++)
+                for (int c = 0; c < COLS; c++)
+                    if (grids[r][c].isMerged())
+                        animEngine.addMerge(r, c, grids[r][c].value);
+        }
+
         // ---- 方向移动 (返回值: 得分; -1 表示无移动) ----
 
         private int doMoveUp() {
+            int[][] preVals = saveValues();
             clearMerge();
             int s = 0;
             boolean moved = false;
@@ -259,10 +326,15 @@ public class GameView extends JPanel implements ActionListener {
                         int v = grids[r][c].moveUp(grids, r, c);
                         if (v >= 0) { s += v; moved = true; }
                     }
+            if (moved) {
+                buildSlideAnims(preVals, DIR_UP);
+                buildMergeAnims();
+            }
             return moved ? s : -1;
         }
 
         private int doMoveDown() {
+            int[][] preVals = saveValues();
             clearMerge();
             int s = 0;
             boolean moved = false;
@@ -272,10 +344,15 @@ public class GameView extends JPanel implements ActionListener {
                         int v = grids[r][c].moveDown(grids, r, c);
                         if (v >= 0) { s += v; moved = true; }
                     }
+            if (moved) {
+                buildSlideAnims(preVals, DIR_DOWN);
+                buildMergeAnims();
+            }
             return moved ? s : -1;
         }
 
         private int doMoveLeft() {
+            int[][] preVals = saveValues();
             clearMerge();
             int s = 0;
             boolean moved = false;
@@ -285,10 +362,15 @@ public class GameView extends JPanel implements ActionListener {
                         int v = grids[r][c].moveLeft(grids, r, c);
                         if (v >= 0) { s += v; moved = true; }
                     }
+            if (moved) {
+                buildSlideAnims(preVals, DIR_LEFT);
+                buildMergeAnims();
+            }
             return moved ? s : -1;
         }
 
         private int doMoveRight() {
+            int[][] preVals = saveValues();
             clearMerge();
             int s = 0;
             boolean moved = false;
@@ -298,6 +380,10 @@ public class GameView extends JPanel implements ActionListener {
                         int v = grids[r][c].moveRight(grids, r, c);
                         if (v >= 0) { s += v; moved = true; }
                     }
+            if (moved) {
+                buildSlideAnims(preVals, DIR_RIGHT);
+                buildMergeAnims();
+            }
             return moved ? s : -1;
         }
 
