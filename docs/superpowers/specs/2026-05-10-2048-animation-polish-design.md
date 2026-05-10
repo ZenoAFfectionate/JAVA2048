@@ -75,9 +75,45 @@ Grid (小幅修改)
 
 ## 测试策略
 
-- 现有 49 个测试用例全部保持通过
-- 动画引擎可通过 `completeAll()` 在测试中即时完成，不增加测试执行时间
-- 手动验证: 启动游戏后操作方向键，观察动画是否流畅
+### 现有测试
+- 现有 49 个测试用例全部保持通过（回归验证）
+- 动画引擎通过 `completeAll()` 在测试中即时完成，保证测试不受动画 Timer 影响
+
+### 新增测试 — `tests/AnimationEngineTest.java` (约 12 用例)
+
+**缓动函数测试 (4 用例):**
+- `easeOutCubic(0) = 0, easeOutCubic(1) = 1` — 边界值
+- `easeOutCubic(0.5)` — 验证曲线形状 (应 > 0.5，快起慢停)
+- `easeOutBack(0) = 0, easeOutBack(1) = 1` — 边界值
+- 弹性过冲验证: `easeOutBack(t)` 在某点 > 1 (过冲特征)
+
+**AnimationEngine 核心测试 (5 用例):**
+- 初始状态 `isAnimating() == false`
+- `addSlideAnimation` 后 `isAnimating() == true`
+- `completeAll()` 后 `isAnimating() == false`，且 tile 位置更新到位
+- `addPopAnimation` / `addMergeGlow` 后动画列表非空
+- `clear()` 清空所有动画
+
+**TileAnimation 逻辑测试 (3 用例):**
+- `getProgress()` 在动画到期后返回 1.0 (不超过 1)
+- `getTransform()` 在 progress=1 时返回终点位置
+- 多个动画同时进行时互不干扰
+
+### 集成测试 — `tests/AnimationIntegrationTest.java` (约 5 用例)
+
+**输入缓冲测试 (3 用例):**
+- 动画期间按键 → keyCode 被缓存 (不丢失输入)
+- 动画完成后自动执行缓存的按键
+- 动画期间多次按键 → 仅缓存最后一次 (保持最优)
+
+**动画与游戏逻辑一致性 (2 用例):**
+- 开启动画的情况下执行 move + spawn 后，棋盘状态与无动画时一致
+- `completeAll()` 后棋盘状态立即同步到最终状态
+
+### 手动验证
+- 启动游戏后操作方向键，观察动画流畅度
+- 快速连按方向键，确认输入缓冲正常工作
+- 观察 tile 弹出、滑动、合并闪烁是否平滑
 
 ## 文件清单
 
@@ -86,4 +122,6 @@ Grid (小幅修改)
 | `src/AnimationEngine.java` | 新增 | 动画管理器 + 缓动 |
 | `src/GameView.java` | 修改 | 集成动画、输入缓冲、UI美化 |
 | `src/Grid.java` | 略改 | 移除 merge 标志的公开暴露 |
+| `tests/AnimationEngineTest.java` | 新增 | 缓动函数 + TileAnimation + AnimationEngine (12 用例) |
+| `tests/AnimationIntegrationTest.java` | 新增 | 输入缓冲 + 动画一致性 (5 用例) |
 | 其他文件 | 不变 | |
