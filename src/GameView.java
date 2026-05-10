@@ -495,9 +495,24 @@ public class GameView extends JPanel implements ActionListener {
             super.paintComponent(g);
             Graphics2D g2 = (Graphics2D) g;
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
+            g2.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
 
-            // 一次计算所有需要的 FontMetrics 并缓存
+            // 构建动画查找表
+            java.util.Map<String, AnimationEngine.Anim> animAt = new java.util.HashMap<>();
+            java.util.Set<String> slideTargets = new java.util.HashSet<>();
+            boolean animating = animEngine.isRunning();
+            if (animating) {
+                for (AnimationEngine.Anim a : animEngine.getAnimations()) {
+                    String key = a.toRow + "," + a.toCol;
+                    if (a.type == AnimationEngine.Type.SLIDE) {
+                        slideTargets.add(key);
+                    }
+                    animAt.put(key, a);
+                }
+            }
+
+            // 缓存 FontMetrics
             Font[] fonts = {
                 new Grid(2).getCheckFont(),
                 new Grid(16).getCheckFont(),
@@ -507,9 +522,27 @@ public class GameView extends JPanel implements ActionListener {
             FontMetrics[] fms = new FontMetrics[4];
             for (int i = 0; i < 4; i++) fms[i] = g2.getFontMetrics(fonts[i]);
 
-            for (int r = 0; r < ROWS; r++)
-                for (int c = 0; c < COLS; c++)
-                    drawTile(g2, r, c, fms);
+            // 第一遍: 绘制静态 tile + POP/MERGE tile (在网格位置)
+            for (int r = 0; r < ROWS; r++) {
+                for (int c = 0; c < COLS; c++) {
+                    String key = r + "," + c;
+                    if (slideTargets.contains(key)) continue;
+                    AnimationEngine.Anim anim = animAt.get(key);
+                    int x = GAP + (GAP + SIZE) * c;
+                    int y = GAP + (GAP + SIZE) * r;
+                    drawTile(g2, r, c, x, y, anim, fms);
+                }
+            }
+
+            // 第二遍: 绘制 SLIDE tile (在插值位置)
+            if (animating) {
+                for (AnimationEngine.Anim a : animEngine.getAnimations()) {
+                    if (a.type != AnimationEngine.Type.SLIDE) continue;
+                    double ax = a.getRenderX(SIZE, GAP);
+                    double ay = a.getRenderY(SIZE, GAP);
+                    drawSlideTile(g2, a, ax, ay);
+                }
+            }
 
             if (checkGameOver()) {
                 g2.setColor(new Color(238, 228, 218, 185));
@@ -522,29 +555,95 @@ public class GameView extends JPanel implements ActionListener {
             }
         }
 
-        private void drawTile(Graphics2D g, int r, int c, FontMetrics[] fms) {
+        /** 绘制静态 tile (含 POP scale / MERGE glow) */
+        private void drawTile(Graphics2D g, int r, int c, int x, int y,
+                              AnimationEngine.Anim anim, FontMetrics[] fms) {
             Grid tile = grids[r][c];
-            int x = GAP + (GAP + SIZE) * c;
-            int y = GAP + (GAP + SIZE) * r;
 
+            boolean isPop = anim != null && anim.type == AnimationEngine.Type.POP;
+            boolean isMerge = anim != null && anim.type == AnimationEngine.Type.MERGE;
+
+            if (isPop && anim.getScale() < 0.05) return;
+
+            float glow = isMerge ? anim.getGlow() : 0f;
+
+            // 阴影
+            g.setColor(new Color(0, 0, 0, 25));
+            g.fillRoundRect(x + 3, y + 3, SIZE, SIZE, ARC, ARC);
+
+            // 背景
             g.setColor(tile.getBackground());
-            g.fillRoundRect(x, y, SIZE, SIZE, ARC, ARC);
+            if (isPop) {
+                double scale = anim.getScale();
+                int sw = (int)(SIZE * scale);
+                int sh = (int)(SIZE * scale);
+                int sx = x + (SIZE - sw) / 2;
+                int sy = y + (SIZE - sh) / 2;
+                g.fillRoundRect(sx, sy, sw, sh, ARC, ARC);
+            } else {
+                g.fillRoundRect(x, y, SIZE, SIZE, ARC, ARC);
+            }
+
+            // 发光叠加 (MERGE)
+            if (glow > 0.01f) {
+                g.setColor(new Color(1f, 1f, 1f, glow * 0.6f));
+                g.fillRoundRect(x, y, SIZE, SIZE, ARC, ARC);
+            }
+
+            // 高数值渐变光泽 (>= 1024)
+            if (tile.value >= 1024 && !tile.isEmpty()) {
+                g.setColor(new Color(255, 255, 255, 35));
+                g.fillRoundRect(x, y + SIZE / 2, SIZE, SIZE / 2, ARC, ARC);
+            }
 
             if (tile.isEmpty()) return;
 
+            // 文字 (合并时稍大)
             g.setColor(tile.getForeground());
             Font font = tile.getCheckFont();
+            if (isMerge && glow > 0.3f) {
+                font = font.deriveFont(font.getSize() * (1f + glow * 0.15f));
+            }
             g.setFont(font);
 
-            // 根据字号选择缓存的 FontMetrics
             FontMetrics fm;
             int sz = font.getSize();
-            if (sz == 46)      fm = fms[0];
-            else if (sz == 40) fm = fms[1];
-            else if (sz == 34) fm = fms[2];
+            if (sz >= 46)      fm = fms[0];
+            else if (sz >= 40) fm = fms[1];
+            else if (sz >= 34) fm = fms[2];
             else               fm = fms[3];
 
             String text = String.valueOf(tile.value);
+            int tx = x + (SIZE - fm.stringWidth(text)) / 2;
+            int ty = y + (SIZE - fm.getHeight()) / 2 + fm.getAscent();
+            g.drawString(text, tx, ty);
+        }
+
+        /** 在插值位置绘制滑动中的 tile */
+        private void drawSlideTile(Graphics2D g, AnimationEngine.Anim a, double ax, double ay) {
+            int x = (int) ax;
+            int y = (int) ay;
+            Grid dummy = new Grid(a.value);
+
+            // 阴影
+            g.setColor(new Color(0, 0, 0, 25));
+            g.fillRoundRect(x + 3, y + 3, SIZE, SIZE, ARC, ARC);
+
+            // 背景
+            g.setColor(dummy.getBackground());
+            g.fillRoundRect(x, y, SIZE, SIZE, ARC, ARC);
+
+            // 高数值光泽
+            if (a.value >= 1024) {
+                g.setColor(new Color(255, 255, 255, 35));
+                g.fillRoundRect(x, y + SIZE / 2, SIZE, SIZE / 2, ARC, ARC);
+            }
+
+            // 文字
+            g.setColor(dummy.getForeground());
+            g.setFont(dummy.getCheckFont());
+            FontMetrics fm = g.getFontMetrics();
+            String text = String.valueOf(a.value);
             int tx = x + (SIZE - fm.stringWidth(text)) / 2;
             int ty = y + (SIZE - fm.getHeight()) / 2 + fm.getAscent();
             g.drawString(text, tx, ty);
