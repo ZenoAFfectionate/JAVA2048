@@ -194,7 +194,7 @@ public class GridTest {
         g[1][0].setMerge(true);
         // g[1][0] 已经 merge=true, 不会再次合并
         int score = g[2][0].moveUp(g, 2, 0);
-        check("no merge when target already merged", score == 0);
+        check("no merge when target already merged (returns -1)", score == -1);
     }
 
     static void testRecursiveMoveChaining() {
@@ -232,7 +232,7 @@ public class GridTest {
         clearMerge(g);
 
         int score = g[1][0].moveUp(g, 1, 0);
-        check("2 and 8 do not merge", score == 0);
+        check("2 and 8 do not merge (returns -1)", score == -1);
         check("both values unchanged", g[0][0].value == 2 && g[1][0].value == 8);
     }
 }

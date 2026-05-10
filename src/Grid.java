@@ -122,15 +122,17 @@ public class Grid {
         if (target.isEmpty()) {
             target.value = this.value;
             this.value = 0;
-            // 递归推进到下一格，方向向量 (ni-i, nj-j)
-            return target.moveTo(grids, ni, nj,
+            // 递归推进到下一格
+            int sub = target.moveTo(grids, ni, nj,
                     ni + (ni - i), nj + (nj - j));
+            // 滑动已成功 (value已转移)，递归结果只用于传播合并得分
+            return Math.max(0, sub);
         } else if (target.value == this.value && !target.merge) {
             target.merge = true;
             target.value *= 2;
             this.value = 0;
             return target.value;
         }
-        return 0;
+        return -1;  // 第一步就无法移动 (目标格有不同值) — 无变化
     }
 }

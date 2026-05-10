@@ -30,10 +30,10 @@ public class Utils {
     private static final int W_MERGE        = 22;   // 相邻相等 bonus (log2)
 
     // ---- 方向常量 ----
-    private static final int DIR_UP    = 0;
-    private static final int DIR_DOWN  = 1;
-    private static final int DIR_LEFT  = 2;
-    private static final int DIR_RIGHT = 3;
+    public static final int DIR_UP    = 0;
+    public static final int DIR_DOWN  = 1;
+    public static final int DIR_LEFT  = 2;
+    public static final int DIR_RIGHT = 3;
 
     static final String[] DIR_NAMES = {"Move Up", "Move Down", "Move Left", "Move Right"};
 
@@ -52,7 +52,7 @@ public class Utils {
     //  棋盘状态 save / restore (原始数组，极低成本)
     // ================================================================
 
-    private static int[][] saveValues(Grid[][] g) {
+    public static int[][] saveValues(Grid[][] g) {
         int[][] v = new int[ROWS][COLS];
         for (int r = 0; r < ROWS; r++)
             for (int c = 0; c < COLS; c++)
@@ -60,7 +60,7 @@ public class Utils {
         return v;
     }
 
-    private static boolean[][] saveMerges(Grid[][] g) {
+    public static boolean[][] saveMerges(Grid[][] g) {
         boolean[][] m = new boolean[ROWS][COLS];
         for (int r = 0; r < ROWS; r++)
             for (int c = 0; c < COLS; c++)
@@ -68,7 +68,7 @@ public class Utils {
         return m;
     }
 
-    private static void restoreState(Grid[][] g, int[][] vals, boolean[][] merges) {
+    public static void restoreState(Grid[][] g, int[][] vals, boolean[][] merges) {
         for (int r = 0; r < ROWS; r++)
             for (int c = 0; c < COLS; c++) {
                 g[r][c].value = vals[r][c];
@@ -80,7 +80,7 @@ public class Utils {
     //  深拷贝 (仅在评估入口调用一次)
     // ================================================================
 
-    private static Grid[][] deepCopy(Grid[][] src) {
+    public static Grid[][] deepCopy(Grid[][] src) {
         Grid[][] dst = new Grid[ROWS][COLS];
         for (int r = 0; r < ROWS; r++)
             for (int c = 0; c < COLS; c++)
@@ -102,7 +102,7 @@ public class Utils {
      *   4. 角落奖励 — 最大值在角落更稳定
      *   5. 合并潜力 — 相邻相等值的 bonus
      */
-    private static int heuristic(Grid[][] g) {
+    public static int heuristic(Grid[][] g) {
         int empty = 0;
         int monoRow = 0, monoCol = 0;
         int smoothPenalty = 0;
@@ -168,14 +168,14 @@ public class Utils {
     //  移动模拟 (in-place)
     // ================================================================
 
-    private static void clearMerge(Grid[][] g) {
+    public static void clearMerge(Grid[][] g) {
         for (Grid[] row : g)
             for (Grid t : row)
                 t.setMerge(false);
     }
 
     /** 在 g 上原地模拟一个方向移动，返回合并得分；不可行返回 -1 */
-    private static int simulateMove(Grid[][] g, int dir) {
+    public static int simulateMove(Grid[][] g, int dir) {
         clearMerge(g);
         int score = 0;
         boolean moved = false;
@@ -247,7 +247,7 @@ public class Utils {
     //  空格工具
     // ================================================================
 
-    private static List<int[]> getEmptyCells(Grid[][] g) {
+    public static List<int[]> getEmptyCells(Grid[][] g) {
         List<int[]> list = new ArrayList<>(16);
         for (int r = 0; r < ROWS; r++)
             for (int c = 0; c < COLS; c++)
@@ -260,7 +260,7 @@ public class Utils {
      * 智能采样 — 优先选择与大数字相邻的空格。
      * 大数字周围的空格对局势影响更大。
      */
-    private static List<int[]> smartSample(Grid[][] g, List<int[]> empties, int limit) {
+    public static List<int[]> smartSample(Grid[][] g, List<int[]> empties, int limit) {
         if (empties.size() <= limit) return new ArrayList<>(empties);
 
         // Score each empty cell by max adjacent value
