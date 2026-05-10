@@ -208,13 +208,24 @@ public class GameView extends JPanel implements ActionListener {
         }
 
         void restart() {
+            animEngine.clear();
+            pendingKeyCode = 0;
             resetScore();
             hasWon = false;
             for (int r = 0; r < ROWS; r++)
                 for (int c = 0; c < COLS; c++)
                     grids[r][c] = new Grid();
-            spawnTile();
-            spawnTile();
+            // 初始两个 tile 不使用动画 (新鲜棋盘)
+            List<int[]> empties = emptyCells();
+            if (empties.size() > 0) {
+                int[] c1 = empties.get(RNG.nextInt(empties.size()));
+                grids[c1[0]][c1[1]].value = RNG.nextDouble() < 0.9 ? 2 : 4;
+                empties.removeIf(c -> c[0] == c1[0] && c[1] == c1[1]);
+            }
+            if (empties.size() > 0) {
+                int[] c2 = empties.get(RNG.nextInt(empties.size()));
+                grids[c2[0]][c2[1]].value = RNG.nextDouble() < 0.9 ? 2 : 4;
+            }
             refreshUI();
             repaint();
             requestFocusInWindow();
@@ -255,12 +266,14 @@ public class GameView extends JPanel implements ActionListener {
             return list;
         }
 
-        /** 随机空格生成 2 (90%) 或 4 (10%) */
-        private void spawnTile() {
+        /** 随机空格生成 2/4 并记录 POP 动画 */
+        private void spawnTileWithAnim() {
             List<int[]> empties = emptyCells();
             if (empties.isEmpty()) return;
             int[] cell = empties.get(RNG.nextInt(empties.size()));
-            grids[cell[0]][cell[1]].value = RNG.nextDouble() < 0.9 ? 2 : 4;
+            int val = RNG.nextDouble() < 0.9 ? 2 : 4;
+            grids[cell[0]][cell[1]].value = val;
+            animEngine.addPop(cell[0], cell[1], val);
         }
 
         // ---- 动画构建 ----
@@ -391,11 +404,20 @@ public class GameView extends JPanel implements ActionListener {
 
         @Override
         public void keyPressed(KeyEvent e) {
+            if (animEngine.isRunning()) {
+                pendingKeyCode = e.getKeyCode();
+                return;
+            }
+            executeMove(e.getKeyCode());
+        }
+
+        private void executeMove(int keyCode) {
+            pendingKeyCode = 0;
             int moveScore;
-            switch (e.getKeyCode()) {
-                case KeyEvent.VK_UP:    moveScore = doMoveUp(); break;
-                case KeyEvent.VK_DOWN:  moveScore = doMoveDown(); break;
-                case KeyEvent.VK_LEFT:  moveScore = doMoveLeft(); break;
+            switch (keyCode) {
+                case KeyEvent.VK_UP:    moveScore = doMoveUp();    break;
+                case KeyEvent.VK_DOWN:  moveScore = doMoveDown();  break;
+                case KeyEvent.VK_LEFT:  moveScore = doMoveLeft();  break;
                 case KeyEvent.VK_RIGHT: moveScore = doMoveRight(); break;
                 case KeyEvent.VK_ESCAPE: restart(); return;
                 case KeyEvent.VK_M:      toggleSound(); refreshUI(); return;
@@ -411,26 +433,35 @@ public class GameView extends JPanel implements ActionListener {
             if (moveScore > 0 && soundOn) new PlaySound("merge.wav").start();
 
             addScore(moveScore);
-            spawnTile();
             refreshUI();
+            spawnTileWithAnim();
             repaint();
 
-            if (!hasWon && checkWin()) {
-                hasWon = true;
-                int res = JOptionPane.showConfirmDialog(frame,
-                        "恭喜！你达成了 2048！\n是否继续游戏？",
-                        "Victory!", JOptionPane.YES_NO_OPTION);
-                if (res != JOptionPane.YES_OPTION) restart();
-            }
-
-            if (checkGameOver()) {
-                refreshUI();
+            animEngine.start(() -> {
                 repaint();
-                int res = JOptionPane.showConfirmDialog(frame,
-                        "Game Over!  得分: " + score + "\n是否重新开始？",
-                        "Game Over", JOptionPane.YES_NO_OPTION);
-                if (res == JOptionPane.YES_OPTION) restart();
-            }
+                if (!hasWon && checkWin()) {
+                    hasWon = true;
+                    int res = JOptionPane.showConfirmDialog(frame,
+                            "恭喜！你达成了 2048！\n是否继续游戏？",
+                            "Victory!", JOptionPane.YES_NO_OPTION);
+                    if (res != JOptionPane.YES_OPTION) restart();
+                    else repaint();
+                }
+                if (checkGameOver()) {
+                    refreshUI();
+                    repaint();
+                    int res = JOptionPane.showConfirmDialog(frame,
+                            "Game Over!  得分: " + score + "\n是否重新开始？",
+                            "Game Over", JOptionPane.YES_NO_OPTION);
+                    if (res == JOptionPane.YES_OPTION) restart();
+                    else repaint();
+                }
+                if (pendingKeyCode != 0) {
+                    int k = pendingKeyCode;
+                    pendingKeyCode = 0;
+                    SwingUtilities.invokeLater(() -> executeMove(k));
+                }
+            });
         }
 
         @Override public void keyReleased(KeyEvent e) {}
