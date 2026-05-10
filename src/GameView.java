@@ -498,6 +498,17 @@ public class GameView extends JPanel implements ActionListener {
             g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
             g2.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
 
+            // 分隔线 — 浅色线条模拟网格
+            g2.setColor(new Color(187, 173, 160, 60));
+            for (int i = 1; i < COLS; i++) {
+                int lineX = GAP + (GAP + SIZE) * i - GAP / 2;
+                g2.fillRoundRect(lineX, GAP, GAP, getHeight() - GAP * 2, 4, 4);
+            }
+            for (int i = 1; i < ROWS; i++) {
+                int lineY = GAP + (GAP + SIZE) * i - GAP / 2;
+                g2.fillRoundRect(GAP, lineY, getWidth() - GAP * 2, GAP, 4, 4);
+            }
+
             // 构建动画查找表
             java.util.Map<String, AnimationEngine.Anim> animAt = new java.util.HashMap<>();
             java.util.Set<String> slideTargets = new java.util.HashSet<>();
