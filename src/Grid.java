@@ -82,6 +82,27 @@ public class Grid {
         return FONT_4;
     }
 
+    // ---- 静态查表 API（供 SLIDE 渲染时使用，避免 new Grid 的分配开销） ----
+
+    public static Color bgColorFor(int value) {
+        if (value == 0) return BG_TABLE[0];
+        int idx = 31 - Integer.numberOfLeadingZeros(value);
+        return idx < BG_TABLE.length ? BG_TABLE[idx] : BG_SUPER;
+    }
+
+    public static Color fgColorFor(int value) {
+        if (value == 0) return FG_EMPTY;
+        if (value <= 4)  return FG_LIGHT;
+        return FG_DARK;
+    }
+
+    public static Font fontFor(int value) {
+        if (value < 10)        return FONT_1;
+        else if (value < 100)  return FONT_2;
+        else if (value < 1000) return FONT_3;
+        return FONT_4;
+    }
+
     // ---- getter / setter ----
 
     public int  getValue()          { return value; }

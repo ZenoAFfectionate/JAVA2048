@@ -1,15 +1,19 @@
 /**
  * 加权贪心算法 — 蛇形权重矩阵强制实现单调性和角落锚定。
  *
- * 权重矩阵: 最大数固定在右下角 (3,3)，权重从角落向外梯度递减。
- *    [[15, 14, 13, 12],
- *     [8,  9,  10, 11],
- *     [7,  6,  5,  4],
- *     [0,  1,  2,  3]]
+ * <p>权重矩阵：最大数固定在右下角 (3,3)，权重从角落向外梯度递减（蛇形）：
+ * <pre>
+ *    [[ 3,  2,  1,  0],
+ *     [ 4,  5,  6,  7],
+ *     [11, 10,  9,  8],
+ *     [12, 13, 14, 15]]
+ * </pre>
  *
- * 核心: 每一步选使 Σ(tileValue × weight) 最大的方向，本质是权重矩阵引导数字按蛇形排列。
+ * <p>核心：每一步选使 Σ(tileValue × weight) 最大的方向，本质是权重矩阵
+ * 引导数字按蛇形排列。
  *
- * 使用方式: int dir = WeightedGreedy.getBestDirection(grids);
+ * <h3>统一口径（2026-05-11 重构）</h3>
+ * 使用 {@link AlgoCommon#pickBestDirection}，与其他算法走同一个 src 游戏底盘。
  */
 public class WeightedGreedy {
 
@@ -17,39 +21,27 @@ public class WeightedGreedy {
 
     /** 蛇形权重矩阵 — 右下角 (3,3) 权重最大=15，蛇形递减到左上 */
     static final int[][] WEIGHTS = {
-        {3,  2,  1,  0},
-        {4,  5,  6,  7},
-        {11, 10, 9,  8},
+        { 3,  2,  1,  0},
+        { 4,  5,  6,  7},
+        {11, 10,  9,  8},
         {12, 13, 14, 15}
     };
+
+    /** 综合评分时各项权重 */
+    private static final int W_IMMEDIATE = 8;     // 合并得分倍率
+    private static final int W_EMPTY     = 800;   // 每个空格价值
 
     /**
      * 返回当前棋盘的最优方向 (0=UP, 1=DOWN, 2=LEFT, 3=RIGHT)
      */
     public static int getBestDirection(Grid[][] grids) {
-        int bestDir = 0;
-        double bestScore = Double.NEGATIVE_INFINITY;
+        return AlgoCommon.pickBestDirection(grids, WeightedGreedy::scoreMove);
+    }
 
-        int[][] savedVals = Utils.saveValues(grids);
-        boolean[][] savedMerges = Utils.saveMerges(grids);
-
-        for (int dir = 0; dir < 4; dir++) {
-            int immediate = Utils.simulateMove(grids, dir);
-            if (immediate < 0) continue;
-
-            double w = weightedSum(grids);
-            int empties = countEmpty(grids);
-            // 综合: 合并得分(放大) + 位置权重 + 空格奖励
-            double score = immediate * 8 + w + empties * 800;
-
-            if (score > bestScore) {
-                bestScore = score;
-                bestDir = dir;
-            }
-
-            Utils.restoreState(grids, savedVals, savedMerges);
-        }
-        return bestDir;
+    private static double scoreMove(Grid[][] state, int dir, int immediate) {
+        double w = weightedSum(state);
+        int empties = AlgoCommon.countEmpty(state);
+        return immediate * W_IMMEDIATE + w + empties * W_EMPTY;
     }
 
     /** 计算加权和: Σ(tileValue × WEIGHTS[r][c]) */
@@ -62,12 +54,9 @@ public class WeightedGreedy {
         return sum;
     }
 
+    /** 数空格 — 保留旧 API 供测试使用 */
     static int countEmpty(Grid[][] g) {
-        int n = 0;
-        for (Grid[] row : g)
-            for (Grid t : row)
-                if (t.isEmpty()) n++;
-        return n;
+        return AlgoCommon.countEmpty(g);
     }
 
     public static String getDirectionName(int dir) {

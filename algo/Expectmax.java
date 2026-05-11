@@ -4,22 +4,32 @@ import java.util.*;
  * Expectimax 搜索算法 — 2048 是随机博弈 (对手是随机环境而非敌对玩家)，
  * 因此使用 Expectimax 而非 Minimax。
  *
- * 节点类型:
- *   - Max 节点 (玩家回合): 遍历 4 方向，选择最大化期望得分的动作
- *   - Chance 节点 (环境回合): 枚举空格生成 2/4 的可能，计算期望值
+ * <h3>节点类型</h3>
+ * <ul>
+ *   <li>Max 节点 (玩家回合): 遍历 4 方向，选择最大化期望得分的动作</li>
+ *   <li>Chance 节点 (环境回合): 枚举空格生成 2/4 的可能，计算期望值</li>
+ * </ul>
  *
- * 优化:
- *   - save/restore 原地操作，避免频繁深拷贝
- *   - 智能采样: 优先采样靠近大数字的空格
- *   - 自适应深度: 空格越少搜索越深
+ * <h3>优化</h3>
+ * <ul>
+ *   <li>save/restore 原地操作，避免频繁深拷贝</li>
+ *   <li>智能采样: 优先采样靠近大数字的空格</li>
+ *   <li>固定 2-ply（实际深度 4）</li>
+ * </ul>
  *
- * 使用方式: int dir = Expectmax.getBestDirection(grids);
+ * <h3>统一口径（2026-05-11 重构）</h3>
+ * <ul>
+ *   <li>顶层 4 方向选择：使用 {@link AlgoCommon#scoreAllDirections}</li>
+ *   <li>递归 max 节点：使用 {@link AlgoCommon#scoreAllDirections}（仅在合法方向中取 max）</li>
+ *   <li>所有 simulate 都走 src 的 {@link Utils#simulateMove}</li>
+ *   <li>所有评估都走 src 的 {@link Utils#heuristic}</li>
+ * </ul>
  */
 public class Expectmax {
 
     private static final int ROWS = 4, COLS = 4;
 
-    /** 搜索深度 (固定 2-ply，平衡速度与质量) */
+    /** 搜索深度 (固定 2-ply，实际递归深度 4) */
     private static final int DEPTH = 2;
 
     /** 每层采样空格数上限 */
@@ -29,44 +39,26 @@ public class Expectmax {
      * 返回当前棋盘的最优方向 (0=UP, 1=DOWN, 2=LEFT, 3=RIGHT)
      */
     public static int getBestDirection(Grid[][] grids) {
-        int depth = DEPTH;
+        // 顶层 max 节点：用 AlgoCommon 统一接口
+        double[] scores = AlgoCommon.scoreAllDirections(grids,
+                (state, dir, immediate) -> immediate + expectimax(state, DEPTH - 1));
 
-        double[] scores = evaluateMoves(grids, depth);
-
-        int best = 0;
-        for (int i = 1; i < 4; i++) {
-            if (scores[i] > scores[best]) best = i;
-        }
-        return scores[best] == Double.NEGATIVE_INFINITY ? 0 : best;
-    }
-
-    /** 对 4 个方向做 depth-ply Expectimax */
-    private static double[] evaluateMoves(Grid[][] grids, int maxDepth) {
-        double[] scores = new double[4];
-        Arrays.fill(scores, Double.NEGATIVE_INFINITY);
-
-        for (int dir = 0; dir < 4; dir++) {
-            int[][] savedVals = Utils.saveValues(grids);
-            boolean[][] savedMerges = Utils.saveMerges(grids);
-
-            int immediate = Utils.simulateMove(grids, dir);
-            if (immediate < 0) {
-                Utils.restoreState(grids, savedVals, savedMerges);
-                continue;
+        int best = -1;
+        double bestVal = Double.NEGATIVE_INFINITY;
+        for (int d = 0; d < 4; d++) {
+            if (scores[d] > bestVal) {
+                bestVal = scores[d];
+                best = d;
             }
-
-            double future = expectimax(grids, maxDepth - 1);
-            scores[dir] = immediate + future;
-
-            Utils.restoreState(grids, savedVals, savedMerges);
         }
-        return scores;
+        return best < 0 ? 0 : best;
     }
 
     /**
-     * 递归 Expectimax:
-     *   depth==0 或 游戏结束 → heuristic()
-     *   depth>0: 空格采样 → spawn 2/4 → 四方向取 max → 期望平均
+     * 递归 Expectimax (chance 节点 — 环境随机 spawn 2/4)。
+     *
+     * <p>depth==0 或无空格 → 启发式叶子兜底；
+     * depth&gt;0：智能采样空格 → 落 2(0.9)/4(0.1) → 调用 max 节点 → 期望平均
      */
     private static double expectimax(Grid[][] g, int depth) {
         if (depth <= 0) return Utils.heuristic(g);
@@ -74,10 +66,10 @@ public class Expectmax {
         List<int[]> empties = getEmptyCells(g);
         if (empties.isEmpty()) return Utils.heuristic(g);
 
-        // 智能采样
         int sampleLimit = Math.min(MAX_SAMPLES, empties.size());
         List<int[]> samples = sampleSmart(g, empties, sampleLimit);
 
+        // 注意：spawn 修改 g 后必须 restore；用 save/restore 而非 deepCopy 节省开销。
         int[][] baseVals = Utils.saveValues(g);
         boolean[][] baseMerges = Utils.saveMerges(g);
 
@@ -101,22 +93,24 @@ public class Expectmax {
         return futureSum / count;
     }
 
-    /** spawn 后做一次四方向 max */
+    /**
+     * spawn 后的 max 节点 — 在 4 方向中取最优。
+     *
+     * <p>用 {@link AlgoCommon#scoreAllDirections} 保证：
+     * <ul>
+     *   <li>所有 4 方向都 save/restore（含 illegal）；</li>
+     *   <li>仅在合法方向中比较；4 方向全非法 → 终态用 heuristic 兜底。</li>
+     * </ul>
+     */
     private static double bestAfterSpawn(Grid[][] g, int depth) {
-        double best = Utils.heuristic(g);
+        double[] scores = AlgoCommon.scoreAllDirections(g,
+                (state, dir, immediate) -> immediate + expectimax(state, depth));
 
-        int[][] savedVals = Utils.saveValues(g);
-        boolean[][] savedMerges = Utils.saveMerges(g);
+        double best = Double.NEGATIVE_INFINITY;
+        for (int d = 0; d < 4; d++)
+            if (scores[d] > best) best = scores[d];
 
-        for (int dir = 0; dir < 4; dir++) {
-            int score = Utils.simulateMove(g, dir);
-            if (score >= 0) {
-                double val = score + expectimax(g, depth);
-                if (val > best) best = val;
-                Utils.restoreState(g, savedVals, savedMerges);
-            }
-        }
-        return best;
+        return best == Double.NEGATIVE_INFINITY ? Utils.heuristic(g) : best;
     }
 
     // ---- helpers ----
@@ -130,7 +124,7 @@ public class Expectmax {
         return list;
     }
 
-    /** 智能采样 — 优先选择靠近大数字的空格 */
+    /** 智能采样 — 优先选择与大数字相邻的空格 */
     private static List<int[]> sampleSmart(Grid[][] g, List<int[]> empties, int limit) {
         if (empties.size() <= limit) return new ArrayList<>(empties);
 

@@ -225,22 +225,27 @@ public class Utils {
     /**
      * 在 g 上尝试四个方向，返回最优的 (immediate_score + heuristic(result))。
      * 调用后 g 恢复原状。
+     *
+     * BUG 修复（2026-05-11）：
+     *   - 旧实现 best = heuristic(g)，把"不动"当合法选项 → 小幅合并被基线淹没。
+     *   - 旧实现 illegal 方向不 restore；但 simulateMove() 即使返回 -1 也已 clearMerge()。
      */
     private static int bestMoveValue(Grid[][] g) {
         int[][] savedVals = saveValues(g);
         boolean[][] savedMerges = saveMerges(g);
 
-        int best = heuristic(g);  // 不动也是一个选项
+        int best = Integer.MIN_VALUE;
 
         for (int dir = 0; dir < 4; dir++) {
             int score = simulateMove(g, dir);
             if (score >= 0) {
                 int value = score + heuristic(g);
                 if (value > best) best = value;
-                restoreState(g, savedVals, savedMerges);
             }
+            // 不论合法与否都要 restore（simulateMove 内部已 clearMerge）
+            restoreState(g, savedVals, savedMerges);
         }
-        return best;
+        return best == Integer.MIN_VALUE ? heuristic(g) : best;
     }
 
     // ================================================================

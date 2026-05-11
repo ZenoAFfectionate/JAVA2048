@@ -1,64 +1,67 @@
-import java.util.*;
-
 /**
  * 固定启发式算法 — 复刻人类高手的 2048 三大黄金规则，通过加权评分函数量化局面优劣。
  *
- * 核心原理:
- *   1. 角落锚定 — 奖励最大值在角落，禁止移动后最大值离开角落
- *   2. 单调性   — 行/列按从大到小梯度排列，便于级联合并
- *   3. 平滑性   — 相邻格子 log2 差异尽可能小
- *   4. 空格奖励 — 空格越多选择越多
+ * <h3>核心原理</h3>
+ * <ol>
+ *   <li>角落锚定 — 奖励最大值在主锚定角 (3,3)，惩罚 max 离开主角</li>
+ *   <li>单调性   — 行/列按从大到小梯度排列，便于级联合并</li>
+ *   <li>平滑性   — 相邻格子 log2 差异尽可能小</li>
+ *   <li>空格奖励 — 空格越多选择越多</li>
+ * </ol>
  *
- * 每一步: 模拟 4 个方向 → 对结果棋盘打分 → 选择得分最高的方向
+ * <p>每一步：模拟 4 个方向 → 对结果棋盘打分 → 选择得分最高的方向。
  *
- * 使用方式: int dir = FixHeuristic.getBestDirection(grids);
- *           String name = FixHeuristic.getDirectionName(dir);
+ * <h3>统一口径（2026-05-11 重构）</h3>
+ * <ul>
+ *   <li>使用 {@link AlgoCommon#pickBestDirection} 统一接口；
+ *       4 算法走同一个 src 游戏底盘 + 同一个 illegal/restore 模板。</li>
+ *   <li>相比手写循环：消除了"忘记 restore"类 BUG，简化代码 60%。</li>
+ * </ul>
  */
 public class FixHeuristic {
 
-    // ---- 权重 (调优至平衡) ----
-    private static final int W_CORNER  = 120;   // 最大值在角落的每 log2 奖励
-    private static final int W_MONO    = 40;    // 单调性每单位得分
-    private static final int W_SMOOTH  = -22;   // 平滑度每单位惩罚
-    private static final int W_EMPTY   = 280;   // 每个空格价值
-    private static final int W_MERGE   = 25;    // 相邻相等 bonus (log2)
+    // ---- 评估函数权重 ----
+    private static final int W_CORNER  = 120;
+    private static final int W_MONO    = 40;
+    private static final int W_SMOOTH  = -22;
+    private static final int W_EMPTY   = 280;
+    private static final int W_MERGE   = 25;
+
+    /** 主锚定角落（右下）— 与 WeightedGreedy 蛇形矩阵的 max 位置一致 */
+    private static final int ANCHOR_R = 3, ANCHOR_C = 3;
+    /** max 不在主锚定角的惩罚（按 log2(maxVal) 缩放，量级与 W_EMPTY*empty 匹配） */
+    private static final int W_OFF_ANCHOR = 200;
 
     private static final int ROWS = 4, COLS = 4;
 
     /**
-     * 返回当前棋盘的最优方向 (0=UP, 1=DOWN, 2=LEFT, 3=RIGHT)
+     * 返回当前棋盘的最优方向 (0=UP, 1=DOWN, 2=LEFT, 3=RIGHT)。
      */
     public static int getBestDirection(Grid[][] grids) {
-        int bestDir = 0;
-        double bestScore = Double.NEGATIVE_INFINITY;
-
-        int[][] savedVals = Utils.saveValues(grids);
-        boolean[][] savedMerges = Utils.saveMerges(grids);
-
-        for (int dir = 0; dir < 4; dir++) {
-            int immediate = Utils.simulateMove(grids, dir);
-            if (immediate < 0) continue;
-
-            double score = immediate + evaluate(grids);
-
-            // 惩罚移动最大值离开角落
-            int[] maxPos = findMax(grids);
-            if (!isCorner(maxPos[0], maxPos[1])) {
-                score -= 500;  // 强惩罚
-            }
-
-            if (score > bestScore) {
-                bestScore = score;
-                bestDir = dir;
-            }
-
-            Utils.restoreState(grids, savedVals, savedMerges);
-        }
-        return bestDir;
+        return AlgoCommon.pickBestDirection(grids, FixHeuristic::scoreMove);
     }
 
     /**
-     * 启发式评估函数 — 综合单调性、平滑度、空格数、合并潜力、角落锚定
+     * 评估一个 simulate 后的局面：
+     *   immediate（合并得分）+ heuristic 评估 + 主锚定角偏好惩罚
+     */
+    private static double scoreMove(Grid[][] state, int dir, int immediate) {
+        double score = immediate + evaluate(state);
+
+        // max 离开主锚定角 (3,3) 时按 log2(max) 缩放惩罚；
+        // 仅奖励单一主角，避免 max 在 4 角之间跳动破坏单调梯度。
+        int[] mp = AlgoCommon.findMax(state);
+        int maxR = mp[0], maxC = mp[1], maxVal = mp[2];
+        if ((maxR != ANCHOR_R || maxC != ANCHOR_C) && maxVal > 0) {
+            int logMax = 31 - Integer.numberOfLeadingZeros(maxVal);
+            score -= (double) W_OFF_ANCHOR * logMax;
+        }
+        return score;
+    }
+
+    /**
+     * 启发式评估函数 — 综合空格、单调性、平滑度、合并潜力、主角奖励。
+     * 量级与 W_EMPTY × empty 在数千 ~ 上万。
      */
     static int evaluate(Grid[][] g) {
         int empty = 0;
@@ -67,7 +70,7 @@ public class FixHeuristic {
         int mergeBonus = 0;
         int maxVal = 0, maxR = 0, maxC = 0;
 
-        // 单遍扫描: 空格、最大值定位、平滑度、合并潜力
+        // 单遍扫描：空格、最大值定位、平滑度、合并潜力
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS; c++) {
                 int v = g[r][c].value;
@@ -90,7 +93,7 @@ public class FixHeuristic {
             }
         }
 
-        // 单调性: 行递减 + 列递减
+        // 单调性：行递减 + 列递减
         for (int r = 0; r < ROWS; r++) {
             for (int c = 0; c < COLS - 1; c++) {
                 if (g[r][c].value != 0 && g[r][c + 1].value != 0) {
@@ -106,8 +109,9 @@ public class FixHeuristic {
             }
         }
 
+        // 角落奖励：仅奖励"主锚定角"(3,3)；其他三角不给奖励 → 单调梯度稳定建立
         int cornerBonus = 0;
-        if (isCorner(maxR, maxC)) {
+        if (maxR == ANCHOR_R && maxC == ANCHOR_C) {
             cornerBonus = 31 - Integer.numberOfLeadingZeros(maxVal);
         }
 
@@ -116,20 +120,6 @@ public class FixHeuristic {
              + W_SMOOTH * smoothPenalty
              + W_CORNER * cornerBonus
              + W_MERGE * mergeBonus;
-    }
-
-    // ---- helpers ----
-
-    private static boolean isCorner(int r, int c) {
-        return (r == 0 || r == 3) && (c == 0 || c == 3);
-    }
-
-    private static int[] findMax(Grid[][] g) {
-        int mv = 0, mr = 0, mc = 0;
-        for (int r = 0; r < ROWS; r++)
-            for (int c = 0; c < COLS; c++)
-                if (g[r][c].value > mv) { mv = g[r][c].value; mr = r; mc = c; }
-        return new int[]{mr, mc};
     }
 
     /** 方向常量 → 可读名称 */
