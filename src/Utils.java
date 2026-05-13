@@ -41,7 +41,13 @@ public class Utils {
 
     public static void writeXML(List<String> keys, List<String> values, String fileName)
             throws FileNotFoundException {
-        try (PrintWriter writer = new PrintWriter(fileName)) {
+        // 自动创建父目录，避免调用方必须先 mkdir 才能写文件
+        java.io.File f = new java.io.File(fileName);
+        java.io.File parent = f.getParentFile();
+        if (parent != null && !parent.exists()) {
+            parent.mkdirs();
+        }
+        try (PrintWriter writer = new PrintWriter(f)) {
             for (int i = 0; i < keys.size(); i++) {
                 writer.println("<" + keys.get(i) + ">" + values.get(i) + "</" + keys.get(i) + ">");
             }

@@ -47,7 +47,18 @@ public class UtilsTest {
 
     static void testWriteAndReadXML() {
         System.out.println("[XML 写入与解析]");
-        String testFile = "data/test_save.xml";
+        // 使用系统临时目录而非项目根目录的 "data/"，避免在工作区产生残留。
+        // 测试结束自动 deleteOnExit() 清理，保证幂等。
+        File tmp;
+        try {
+            tmp = File.createTempFile("java2048-test-save-", ".xml");
+            tmp.deleteOnExit();
+        } catch (IOException e) {
+            System.out.println("  ✗ 创建临时文件失败：" + e.getMessage());
+            failed++;
+            return;
+        }
+        String testFile = tmp.getAbsolutePath();
 
         List<String> keys = new ArrayList<>();
         keys.add("testKey1");
@@ -79,6 +90,11 @@ public class UtilsTest {
             return;
         }
         check("read XML without error", true);
+
+        // 显式清理（除了 deleteOnExit 兜底）
+        if (f.exists() && !f.delete()) {
+            f.deleteOnExit();
+        }
     }
 
     // ---- AI 提示 ----

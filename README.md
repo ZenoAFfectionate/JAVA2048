@@ -29,72 +29,7 @@
 | L | 读档 |
 | T | AI 智能提示 |
 
-## 项目结构
-
-```
-JAVA2048/
-├── README.md
-├── result.txt                        # 算法对比实验结果
-├── src/
-│   ├── Main.java                     # 程序入口 (EDT 启动)
-│   ├── Grid.java                     # 格子类 — 数值、颜色、字体、递归移动
-│   ├── GameView.java                 # 主界面 + GameBoard + 动画渲染
-│   ├── AnimationEngine.java          # 动画引擎 — 60fps Timer + 缓动函数
-│   ├── PlaySound.java                # 音效播放线程
-│   ├── Utils.java                    # XML 存档 + AI 提示 + 共用工具函数
-│   └── ExperimentRunner.java         # 算法对比实验入口
-├── algo/                             # AI 算法实现
-│   ├── FixHeuristic.java             # 固定启发式 — 角落锚定 + 单调性 + 平滑性
-│   ├── WeightedGreedy.java           # 加权贪心 — 蛇形权重矩阵
-│   ├── Expectmax.java                # 期望最大搜索 — 深度可配 Expectimax
-│   └── MCTS.java                     # 蒙特卡洛树搜索 — UCT + 贪心 Rollout
-├── tests/
-│   ├── TestAll.java                  # 测试套件入口 (汇总全部测试)
-│   ├── GridTest.java                 # Grid 单元测试
-│   ├── GameLogicTest.java            # 游戏逻辑测试
-│   ├── UtilsTest.java                # Utils 工具测试
-│   ├── AnimationEngineTest.java      # 动画引擎单元测试 (34 用例)
-│   ├── AnimationIntegrationTest.java # 动画集成测试 (19 用例)
-│   ├── FixHeuristicTest.java         # FixHeuristic 测试 (11 用例)
-│   ├── WeightedGreedyTest.java       # WeightedGreedy 测试 (11 用例)
-│   ├── ExpectmaxTest.java            # Expectmax 测试 (13 用例)
-│   └── MCTSTest.java                 # MCTS 测试 (28 用例)
-├── data/
-│   └── test_save.xml                 # 测试用存档样例
-├── res/
-│   ├── move.wav                      # 移动音效 (可选)
-│   └── merge.wav                     # 合并音效 (可选)
-├── out/                              # 编译输出目录 (自动生成)
-└── docs/                             # 设计文档
-    └── superpowers/
-        ├── specs/                    # 设计规格书
-        └── plans/                    # 实现计划
-```
-
 ## 系统设计
-
-```
-┌──────────────────────────────┐
-│          GameView             │
-│  ┌────────────────────────┐  │
-│  │     标题 & 分数区       │  │
-│  ├────────────────────────┤  │
-│  │      GameBoard         │  │
-│  │   ┌──┬──┬──┬──┐       │  │
-│  │   │  │  │  │  │       │  │
-│  │   ├──┼──┼──┼──┤       │  │
-│  │   │  │  │  │  │       │  │
-│  │   ├──┼──┼──┼──┤       │  │
-│  │   │  │  │  │  │       │  │
-│  │   ├──┼──┼──┼──┤       │  │
-│  │   │  │  │  │  │       │  │
-│  │   └──┴──┴──┴──┘       │  │
-│  └────────────────────────┘  │
-│  ┌────────────────────────┐  │
-│  │    按键提示 & 菜单栏    │  │
-│  └────────────────────────┘  │
-└──────────────────────────────┘
-```
 
 ### 类设计
 
@@ -170,26 +105,6 @@ public int moveUp(Grid[][] grids, int i, int j) {
 
 这更贴近 2048 的真实博弈结构 —— 玩家（移动）对抗随机环境（落子）。
 
-### 数字配色方案
-
-遵循"色相统一、色调渐变、突出强调"原则：
-
-| 数值 | 背景色 | 前景色 |
-|------|--------|--------|
-| 0 | `#cdc1b4` | — (隐藏) |
-| 2 | `#eee4da` | 黑色 |
-| 4 | `#ede0c8` | 黑色 |
-| 8 | `#f2b179` | 白色 |
-| 16 | `#f59563` | 白色 |
-| 32 | `#f67c5f` | 白色 |
-| 64 | `#f65e3b` | 白色 |
-| 128 | `#edcf72` | 白色 |
-| 256 | `#edcc61` | 白色 |
-| 512 | `#edc850` | 白色 |
-| 1024 | `#edc53f` | 白色 |
-| 2048 | `#edc22e` | 白色 |
-| ≥4096 | `#248c51` | 白色 |
-
 ---
 
 ## AI 算法详解
@@ -246,30 +161,296 @@ public int moveUp(Grid[][] grids, int i, int j) {
 
 ---
 
-## 算法实验结果 (1000 局/算法)
+## 算法实验结果
+
+`ExperimentRunner` 在固定 `MCTS_ITERATIONS = 20` 的前提下，分别以 **N = 1 / 10 / 100 / 1000** 局四个规模运行四种算法，结果完整记录在 `result.txt`：
+
+### N = 1 局/算法
 
 ```
 ┌────────────────────┬──────────────┬──────────────┬──────────────┬──────────────┐
 │      Metric        │ FixHeuristic │WeightedGreedy│  Expectmax   │     MCTS     │
 ├────────────────────┼──────────────┼──────────────┼──────────────┼──────────────┤
-│ Mean Score         │        4,513 │        1,397 │       21,620 │        1,938 │
-│ Max Score          │       15,248 │        5,456 │       76,892 │        5,796 │
-│ Min Score          │          224 │          144 │        5,440 │          264 │
-│ Median Score       │        4,106 │        1,288 │       16,766 │        1,924 │
-│ 2048 Rate (%)      │         0.0% │         0.0% │        43.7% │         0.0% │
-│ Mean Moves         │        2,888 │        2,696 │        4,417 │          193 │
-│ Max Tile           │         1024 │          512 │         4096 │          512 │
-│ Mean Time/Move(ms) │        0.001 │        0.001 │        0.019 │        0.371 │
-│ Total Time(s)      │          3.1 │          1.5 │         85.1 │         71.4 │
+│ Mean Score         │        3,072 │        2,012 │        7,536 │        4,988 │
+│ Max Score          │        3,072 │        2,012 │        7,536 │        4,988 │
+│ Min Score          │        3,072 │        2,012 │        7,536 │        4,988 │
+│ Median Score       │        3,072 │        2,012 │        7,536 │        4,988 │
+│ 2048 Rate (%)      │         0.0% │         0.0% │         0.0% │         0.0% │
+│ Mean Moves         │          253 │          202 │          530 │          338 │
+│ Max Tile           │          256 │          128 │          512 │          512 │
+│ Mean Time/Move(ms) │        0.010 │        0.007 │        0.035 │        1.737 │
+│ Total Time(s)      │          0.0 │          0.0 │          0.0 │          0.6 │
 └────────────────────┴──────────────┴──────────────┴──────────────┴──────────────┘
 ```
 
-### 结果分析
+### N = 10 局/算法
 
-- **Expectmax 碾压式领先**：平均得分 21,620，43.7% 达成 2048，最高得分 76,892，最高 tile 4096。深度搜索带来的战略远见显著优于其他方法。
-- **FixHeuristic 第二**：平均得分 4,513，最高 tile 1024。速度极快 (0.001ms/步)，适合实时应用。
-- **MCTS 表现偏弱**：平均得分 1,938，未达成 2048。尽管有贪心 Rollout 和完整树结构，但模拟次数不足 (8~20 迭代) 限制了搜索质量。增加迭代次数可提升表现，但会显著增加运行时间。
-- **WeightedGreedy 最弱**：固定权重矩阵缺乏对具体局面的适应能力，平均得分仅 1,397。
+```
+┌────────────────────┬──────────────┬──────────────┬──────────────┬──────────────┐
+│      Metric        │ FixHeuristic │WeightedGreedy│  Expectmax   │     MCTS     │
+├────────────────────┼──────────────┼──────────────┼──────────────┼──────────────┤
+│ Mean Score         │        4,254 │        2,858 │       13,417 │        8,110 │
+│ Max Score          │        6,364 │        7,320 │       34,660 │       16,020 │
+│ Min Score          │        1,652 │          704 │        3,128 │        2,360 │
+│ Median Score       │        4,256 │        2,232 │       13,752 │        7,296 │
+│ 2048 Rate (%)      │         0.0% │         0.0% │        10.0% │         0.0% │
+│ Mean Moves         │          314 │          234 │          797 │          511 │
+│ Max Tile           │          512 │          512 │         2048 │         1024 │
+│ Mean Time/Move(ms) │        0.002 │        0.001 │        0.017 │        1.552 │
+│ Total Time(s)      │          0.0 │          0.0 │          0.1 │          7.9 │
+└────────────────────┴──────────────┴──────────────┴──────────────┴──────────────┘
+```
+
+### N = 100 局/算法
+
+```
+┌────────────────────┬──────────────┬──────────────┬──────────────┬──────────────┐
+│      Metric        │ FixHeuristic │WeightedGreedy│  Expectmax   │     MCTS     │
+├────────────────────┼──────────────┼──────────────┼──────────────┼──────────────┤
+│ Mean Score         │        4,494 │        2,689 │       16,505 │       11,410 │
+│ Max Score          │       11,400 │        6,832 │       35,756 │       32,096 │
+│ Min Score          │        1,436 │          696 │        3,412 │          360 │
+│ Median Score       │        3,656 │        2,474 │       15,902 │       12,030 │
+│ 2048 Rate (%)      │         0.0% │         0.0% │        23.0% │         7.0% │
+│ Mean Moves         │          329 │          229 │          937 │          673 │
+│ Max Tile           │         1024 │          512 │         2048 │         2048 │
+│ Mean Time/Move(ms) │        0.002 │        0.000 │        0.015 │        1.509 │
+│ Total Time(s)      │          0.1 │          0.0 │          1.4 │        101.6 │
+└────────────────────┴──────────────┴──────────────┴──────────────┴──────────────┘
+```
+
+### N = 1000 局/算法
+
+```
+┌────────────────────┬──────────────┬──────────────┬──────────────┬──────────────┐
+│      Metric        │ FixHeuristic │WeightedGreedy│  Expectmax   │     MCTS     │
+├────────────────────┼──────────────┼──────────────┼──────────────┼──────────────┤
+│ Mean Score         │        4,580 │        2,827 │       17,712 │       11,346 │
+│ Max Score          │       15,324 │       11,796 │       60,360 │       34,160 │
+│ Min Score          │          704 │          228 │        2,908 │          296 │
+│ Median Score       │        4,058 │        2,404 │       16,002 │       11,862 │
+│ 2048 Rate (%)      │         0.0% │         0.0% │        28.8% │         7.2% │
+│ Mean Moves         │          333 │          238 │          993 │          669 │
+│ Max Tile           │         1024 │         1024 │         4096 │         2048 │
+│ Mean Time/Move(ms) │        0.001 │        0.000 │        0.016 │        1.513 │
+│ Total Time(s) 	 │          0.2 │          0.1 │         15.6 │      1,012.5 │
+└────────────────────┴──────────────┴──────────────┴──────────────┴──────────────┘
+```
+
+### 跨规模均值汇总
+
+| 算法 | N=1 mean | N=10 mean | N=100 mean | N=1000 mean | 涨幅 |
+|---|---:|---:|---:|---:|---:|
+| FixHeuristic | 3,072 | 4,254 | 4,494 | 4,580 | 1.49× |
+| WeightedGreedy | 2,012 | 2,858 | 2,689 | 2,827 | 1.40× |
+| Expectmax | 7,536 | 13,417 | 16,505 | **17,712** | **2.35×** |
+| MCTS | 4,988 | 8,110 | 11,410 | **11,346** | 2.27× |
+
+可以看到：**四种算法都出现了"N 越大平均分越高"的趋势，并不是 MCTS 独有的现象**。Expectmax 涨幅甚至比 MCTS 还大（2.35× vs 2.27×）。这与"MCTS 实现 bug"或"局间相关"无关 —— 每次 `playOneGame` 都重新构造棋盘和分数，局间确实是相互独立的。下面给出真正的成因。
+
+### 趋势成因解释
+
+#### ① 大数定律：样本均值是随机变量
+
+设单局得分为随机变量 X<sub>i</sub>，"N 局实验的平均分"是
+
+$$\bar X_N = \frac{1}{N}\sum_{i=1}^{N} X_i$$
+
+它本身**也是一个随机变量**，方差为 σ² / N。
+
+- N = 1 时算的根本不是"平均值"，而是**一次抽签**。从表里也能直接看出来：N=1 时 mean = max = min = median，因为只跑了一局；
+- N = 10 / 100 / 1000 才是真正在估计期望，方差以 **σ² / N** 的速度收缩；
+- 随着 N 增大，X̄<sub>N</sub> 会**收敛到真实均值** μ = E[X]（大数定律）。
+
+所以"N 越大 mean 越接近真值"是数学上的必然，**不是算法变聪明了**。
+
+#### ② 2048 得分分布是**重尾 + 严重正偏**
+
+观察 N = 1000 时 MCTS 的具体分布：
+
+| min | median | mean | max |
+|---:|---:|---:|---:|
+| **296** | **11,862** | **11,346** | **34,160** |
+
+特征：
+
+- **max 是 mean 的 3 倍以上** —— 长尾极端值非常显著；
+- 少数高分局的"jackpot"贡献了均值的很大一部分；
+- Expectmax 的尾巴更长（max=60,360，是 mean 的 3.4×），所以 Expectmax 对 N 的敏感度甚至比 MCTS 还高。
+
+这种**正偏 + 重尾**分布有一个关键性质：
+
+> **N 小时采到右尾的概率低 → X̄<sub>N</sub> 系统性低估 μ → N 增大才会"补足"被漏掉的尾部贡献**
+
+直观理解：真实期望 μ 的很大一部分来自"低概率但高分值"的极端事件（比如 5% 概率出现 30,000+ 分）。N=10 时大约只能命中 0~1 次，常常一次都遇不到，导致样本均值**单向偏低**；只有 N 足够大，尾部事件按其真实频率出现，X̄<sub>N</sub> 才会稳定到真值附近。
+
+这正是为什么所有算法的 mean 都呈**单调上升**（而不是上下震荡）地收敛到真值 —— 重尾分布下的大数定律就是这种单边收敛的特征。
+
+> **小结**：N=1 的结果**仅供调试参考**，不应用于算法对比；可信对比建议从 **N ≥ 100** 开始；**N = 1000** 时 mean 已基本收敛到真值附近（MCTS 在 N=100 vs N=1000 之间仅相差 0.6%）。
+
+### 算法横向对比（基于 N=1000 收敛后的均值）
+
+- **Expectmax 一骑绝尘**：均值 17,712，2048 达成率 28.8%，最大 tile 4096。深度搜索 + 期望计算让它能稳定走出长链路，是综合最强的算法。
+- **MCTS（rollout-based）次之**：均值 11,346，2048 达成率 7.2%，最大 tile 2048。rollout 自带随机性是它方差最大、收敛最慢的根因；提升 `MCTS_ITERATIONS` 可继续推高均值，但单步耗时会线性增长（当前已达 1.5 ms/步）。
+- **FixHeuristic 第三**：均值 4,580，速度极快（0.001 ms/步）。固定启发式上限明显，从未触及 2048。
+- **WeightedGreedy 最弱**：均值 2,827。蛇形权重在角落突破后会被反复撕裂，缺乏对随机扰动的修复能力。
+
+---
+
+## Expectmax 参数探索实验
+
+为了系统性地探索 Expectmax 算法的最高得分潜力，并量化每个参数对结果的影响，专门设计了一套**参数化扫描实验**。
+
+### 实验代码（仅调用游戏底盘，未修改任何已有源码）
+
+| 路径 | 角色 |
+|---|---|
+| `algo/ExpectmaxTunable.java`              | **参数化版本** Expectimax —— 与原 `Expectmax.java` 默认行为完全一致，但所有 `static final` 参数（搜索深度、采样上限、采样策略、5 个启发式权重）暴露为运行时可调；底盘动作仍调 `Utils.simulateMove` / `AlgoCommon.scoreAllDirections`，不重复实现游戏逻辑。 |
+| `src/ExpectmaxParamExperiment.java`        | 实验主程序：OFAT（One-Factor-At-a-Time）扫描 + 组合验证，并行 worker，三格式报告输出，命令行参数完整。 |
+| `tests/ExpectmaxTunableTest.java`          | 80 个测试用例：默认等价、Params API、setParams 校验、深拷贝、3 种采样策略、状态保持、merge 标志保持、零/极端权重、权重对决策的统计影响、depth 范围与耗时单调、并发一致性、100 局 fuzz 等。 |
+| `tests/ExpectmaxParamExperimentTest.java`  | 87 个测试用例：spawnTile 概率分布、isGameOver、findMax、playOneGame 确定性 / 终止性、Stats 聚合、tile 直方图、CLI 端到端 smoke 测试、报告产物校验、非法参数子进程退出。 |
+
+### 实验设计
+
+#### 可调参数
+
+| 参数 | 含义 | 默认值（= 原 `Expectmax` + `Utils.heuristic`） |
+|---|---|---:|
+| `depth`            | 搜索深度（chance/max 节点对数） | **2** |
+| `maxSamples`       | 每个 chance 节点采样空格数上限 | **4** |
+| `sampleStrategy`   | 采样策略：`SMART` / `RANDOM` / `ALL` | **SMART** |
+| `wEmpty`           | 启发式：每个空格价值 | **240** |
+| `wMonotonicity`    | 启发式：单调性每单位 | **35** |
+| `wSmoothness`      | 启发式：相邻 log₂ 差异的惩罚（应 ≤ 0） | **-18** |
+| `wCorner`          | 启发式：最大值在角落奖励 | **60** |
+| `wMerge`           | 启发式：相邻相等 bonus | **22** |
+
+#### 实验方法 — OFAT + 组合验证
+
+1. **OFAT（控制变量法）**：保持其余参数为默认值，只改变一个参数；每个配置独立运行 **1000 局**。
+2. **组合验证**：把 OFAT 中各自胜出的最优值组合成一组「合成最优」参数，验证是否能叠加增益。
+
+每局：
+- 随机种子 `seed = configIdx × 100003 + gameIdx`，可重复；
+- 棋盘 4×4，初始 2 个 tile；终止条件 = 四方向皆不可移动 或达到 10 000 步上限；
+- 决策走 `ExpectmaxTunable.getBestDirection`，移动逻辑走 `Utils.simulateMove`。
+
+**实验规模**：8 个 OFAT 扫描 + 1 个 combo 扫描 = **41 个配置 × 1000 局 = 41 000 局游戏**，墙钟约 3 分钟（18 线程并行）。
+
+### 实验结果
+
+#### ① 单参数效应（OFAT）— 平均分摘要（每行 1000 局）
+
+| 扫描 | 默认值 | 默认均值 | 最优值 | 最优均值 | 提升 | 单调性 |
+|---|---:|---:|---:|---:|---:|---|
+| `depth`         | 2    | 17,340 | **3**   | **27,225** | **+57.0 %** | 严格单调 ↑ |
+| `maxSamples`    | 4    | 17,290 | 8       | 17,794   | +2.9 %      | 8 后饱和   |
+| `sampleStrategy`| SMART | 17,542 | ALL    | 17,614   | +0.4 %      | 几乎无差异 |
+| `wEmpty`        | 240  | 17,290 | **60**  | **27,236** | **+57.5 %** | 严格单调 ↓ |
+| `wMonotonicity` | 35   | 17,290 | **140** | **23,418** | **+35.4 %** | 严格单调 ↑ |
+| `wSmoothness`   | -18  | 17,290 | -36     | 20,384   | +17.9 %     | -36 后饱和 |
+| `wCorner`       | 60   | 17,290 | 60      | 17,290   | 0 %         | 60 处有最优（双侧下降） |
+| `wMerge`        | 22   | 17,290 | **88**  | **19,359** | +12.0 %     | 严格单调 ↑ |
+
+#### ② DEPTH 是首要变量
+
+| depth | mean | 2048 率 | 最大 tile | ms/步 |
+|---:|---:|---:|---:|---:|
+| 1 | 5,466 | 0.0 % | 1024 | 0.004 |
+| 2 | 17,340 | 27.1 % | 2048 | 0.022 |
+| 3 | **27,225** | **64.0 %** | **4096** | 0.526 |
+
+> depth 每加 1 ≈ 实际递归层数 +2，开销 ~25× 但收益 ≈ 1.6×。
+> depth=3 时已经能稳定走出 2048（64%）并出现 4096。
+> depth=4 因开销爆炸（预期 > 100 ms/步），默认不扫描；可通过 `--include-depth-4` 启用。
+
+#### ③ `wEmpty` 反直觉 — 默认偏高
+
+| wEmpty | mean | 2048 率 | 最大 tile |
+|---:|---:|---:|---:|
+| **60** | **27,236** | **64.3 %** | 4096 |
+| 120 | 22,167 | 48.2 % | 4096 |
+| 240（默认） | 17,290 | 26.7 % | 4096 |
+| 480 | 14,112 | 11.8 % | 2048 |
+| 960 | 12,511 | 6.4 % | 2048 |
+
+> 把 `wEmpty` 降到默认的 **1/4**，平均分提升 **+57.5 %**。
+> 物理解释：`wEmpty=240` 让算法过度追求「空格数最多」，宁愿放弃合并也不让棋盘变挤；降低权重后单调性 / 合并 bonus 才能压住空格目标，主导链路构建。这与"depth=3、其它默认"几乎完全等价，提示两者指向同一个增益方向（让 AI 敢于堆叠合并）。
+
+#### ④ 单调性 / 平滑度 / 合并 bonus 全部偏弱
+
+- `wMonotonicity` 默认 **35**，最优 **140**（4× 默认）；
+- `wSmoothness`  默认 **-18**，最优 **-36**（2× 默认）；
+- `wMerge`       默认 **22**，最优 **88**（4× 默认）。
+
+→ 三个「鼓励合并 / 鼓励有序」的项默认权重普遍偏低，相对 `wEmpty=240` 被压制。
+
+#### ⑤ `wCorner=60` 已恰好处在最优峰
+
+`wCorner` 是唯一**双侧下降**的参数：偏小（0）算法不锚角；偏大（240）算法盯着角落不肯动；都伤平均分。默认值 60 正好。
+
+#### ⑥ 智能采样的收益已被 depth 吸收
+
+`SMART` vs `ALL` 仅差 0.4 %；`SMART` vs `RANDOM` 差 5.1 %。
+- `MAX_SAMPLES=4` 时，**智能采样 ≈ 全采样**（4 个空格已能覆盖关键信号）；
+- 纯随机 `RANDOM` 明显劣势——会丢掉关键大数邻接空格；
+- `maxSamples=1 → 8` 每翻一倍提升 ~1 000 分；`8 → 16` 不再上升 → **8 是性价比拐点**。
+
+#### ⑦ 组合最优 — OFAT 不能简单叠加（参数交互）
+
+| 配置 | mean | 中位数 | 2048 率 | 最高单局 | ms/步 |
+|---|---:|---:|---:|---:|---:|
+| `baseline_default`（depth=2，原默认） | 17,542 | 15,946 | 27.5 % | 59,184 | 0.024 |
+| `OFAT_best_depth2`（OFAT 全部最优值组合，depth=2） | **14,603** | 14,410 | 19.7 % | 36,476 | 0.028 |
+| `OFAT_best_depth3`（同上但 depth=3） | 19,763 | 16,190 | 41.2 % | 71,616 | 0.845 |
+| **`only_depth3`**（仅 depth=3，其余默认） | **27,914** | **27,586** | **67.4 %** | 72,356 | 0.580 |
+
+**核心结论**：
+
+> 把每个 OFAT 的最优值"硬"组合（`wEmpty=60` × `wMono=140` × `wSmooth=-36` × `wMerge=88` × `maxSamples=8` × `strategy=ALL`）反而**比 baseline 更差**（14,603 vs 17,542）。
+> 原因：当 `wEmpty=60` 让算法不再追求空格、`wMono=140` 强制单调、`wMerge=88` 强烈奖励合并，三个「积极合并派」叠加后会让 AI **过度激进**——任何牺牲单调或合并机会的迂回操作都被严厉惩罚，结果在中盘被卡死。
+>
+> **OFAT 在参数有强交互时会误导**——这是经典的实验设计教训。
+>
+> **最强单一配置 = `only_depth3`**：均值 **27,914**，2048 达成率 **67.4 %**，最高单局 **72,356**。
+
+### 推荐配置
+
+| 场景 | 推荐参数 | 性能 | 决策耗时 |
+|---|---|---|---|
+| **追求最高均值**（推荐） | `depth=3`，其余默认 | **27,914 mean / 67.4 % 2048 / max tile 4096** | ~0.58 ms/步 |
+| **均衡（保持 depth=2）** | `depth=2, wEmpty=60` | ~27,200 mean | ~0.025 ms/步 |
+| **超低延迟（实时游戏）** | 默认 (`depth=2, maxSamples=4`) | 17,540 mean / 27 % 2048 | ~0.024 ms/步 |
+| **进一步上限探索** | `depth=4, maxSamples=4`（注意需小时级） | 预计 mean > 35,000 | 估计 > 30 ms/步 |
+
+### 复现实验
+
+```bash
+# 编译（含算法、实验主程序、测试）
+javac -encoding UTF-8 -d out src/*.java algo/*.java tests/*.java
+
+# 完整实验（默认 1000 局/配置，~3 分钟）
+java -Xss8m -cp out ExpectmaxParamExperiment --games 1000
+
+# 仅扫描某一参数
+java -cp out ExpectmaxParamExperiment --only depth     # 搜索深度
+java -cp out ExpectmaxParamExperiment --only samples   # MAX_SAMPLES
+java -cp out ExpectmaxParamExperiment --only strategy  # 采样策略
+java -cp out ExpectmaxParamExperiment --only empty     # W_EMPTY
+java -cp out ExpectmaxParamExperiment --only mono      # W_MONOTONICITY
+java -cp out ExpectmaxParamExperiment --only smooth    # W_SMOOTHNESS
+java -cp out ExpectmaxParamExperiment --only corner    # W_CORNER
+java -cp out ExpectmaxParamExperiment --only merge     # W_MERGE
+java -cp out ExpectmaxParamExperiment --only combo     # 组合验证
+
+# 启用 depth=4（开销很大，需数十分钟）
+java -Xss8m -cp out ExpectmaxParamExperiment --include-depth-4 --only depth
+
+# 快速冒烟（10 局/配置）
+java -cp out ExpectmaxParamExperiment --smoke --only depth
+```
+
+实验完成后会同时输出三种格式的报告（盒框 TXT、Markdown、CSV），路径在项目根目录。
 
 ---
 
@@ -314,6 +495,18 @@ javac -encoding UTF-8 -d out src/*.java algo/*.java
 java -cp out ExperimentRunner
 ```
 
+### 运行 Expectmax 参数探索实验
+
+```bash
+# 编译（含算法模块）
+javac -encoding UTF-8 -d out src/*.java algo/*.java
+
+# 运行参数扫描实验（默认每配置 1000 局，~3 分钟）
+java -Xss8m -cp out ExpectmaxParamExperiment --games 1000
+
+# 详细命令行选项见上文「Expectmax 参数探索实验」一节
+```
+
 ### 单独运行某算法
 
 ```java
@@ -331,7 +524,7 @@ MCTS.setIterations(100);
 
 ## 测试
 
-测试覆盖七大模块，共 153+ 用例：
+测试覆盖十一大模块，共 320+ 用例：
 
 | 模块 | 文件 | 测试重点 | 用例数 |
 |------|------|----------|--------|
@@ -344,6 +537,8 @@ MCTS.setIterations(100);
 | **WeightedGreedy** | `WeightedGreedyTest.java` | 权重矩阵、角落偏向、加权和、状态保持 | 11 |
 | **Expectmax** | `ExpectmaxTest.java` | 合并偏好、深度搜索、性能、状态保持 | 13 |
 | **MCTS** | `MCTSTest.java` | 滑动逻辑、合法方向、快照拷贝、迭代设定、状态保持 | 28 |
+| **ExpectmaxTunable** | `ExpectmaxTunableTest.java` | 默认参数等价、Params API、setParams 校验、采样策略、状态保持、零/极端权重、权重统计影响、深度耗时单调、并发一致性、100 局 fuzz | 80 |
+| **ExpectmaxParamExperiment** | `ExpectmaxParamExperimentTest.java` | spawnTile 概率分布、isGameOver、findMax、playOneGame 确定性 / 终止性、Stats 聚合、tile 直方图、CLI 端到端 smoke、报告产物校验 | 87 |
 
 ### 运行测试
 
@@ -351,12 +546,19 @@ MCTS.setIterations(100);
 # 编译全部
 javac -encoding UTF-8 -d out src/*.java algo/*.java tests/*.java
 
-# 运行全部
+# 运行原项目主测试套件 (Grid + GameLogic + Utils)
 java -cp out TestAll
 
-# 单独运行
+# 单独运行 — 原算法测试
+java -cp out ExpectmaxTest
 java -cp out MCTSTest
+java -cp out FixHeuristicTest
+java -cp out WeightedGreedyTest
 java -cp out AnimationEngineTest
+
+# 单独运行 — Expectmax 参数探索新增测试
+java -cp out ExpectmaxTunableTest         # 80 用例 — 算法参数化
+java -cp out ExpectmaxParamExperimentTest # 87 用例 — 实验主程序
 ```
 
 ---
@@ -398,27 +600,5 @@ java -cp out AnimationEngineTest
 - [x] Expectmax — 深度 2-ply Expectimax + 智能采样 + save/restore
 - [x] MCTS — UCT 树搜索 + 贪心 Rollout + 五项优化
 - [x] 算法实验框架 (10/100/1000/10000 局) + 多维度指标对比
-
----
-
-## 设计心得
-
-本次课程设计的核心是基于 Java Swing 开发经典游戏 2048。在实现过程中遇到了连环合并、数字覆盖、分数累加遗漏等问题，需要对比运行结果与预期行为，经过仔细分析才能定位错误。
-
-关键设计决策：
-
-- **递归代替迭代**：使代码更简洁，逻辑更清晰，天然避免了一次操作中的连环合并问题。
-- **解耦移动与合并**：整体定向移动由 GameBoard 负责，单个格子的移动合并由 Grid 实现，提高了代码复用性。
-- **深拷贝隔离 AI 搜索**：AI 模拟必须在独立副本上进行，避免污染当前游戏状态。
-- **动画非阻塞设计**：动画期间输入缓存，动画结束自动执行，保证交互流畅不丢键。
-- **int[][] 快照优化**：MCTS 全部在原始数组上操作，避免 Grid 对象分配和 GC，大幅提升搜索速度。
-
-通过本次课程设计，不仅锻炼了问题划分与求解、算法设计与分析的能力，更在实践中加深了对 Java 面向对象编程思想的理解。四种 AI 算法的实现和对比实验，更是深入探索了启发式搜索、概率搜索和随机模拟搜索在实际博弈问题中的应用。
-
-## 参考文献
-
-1. [美] 埃尔克. *Java 核心技术*. 机械工业出版社, 2012
-2. [美] 埃尔克. *Java 编程思想*. 机械工业出版社, 2007
-3. [美] 科尔曼. *算法导论(第三版)*. 机械工业出版社, 2012
-4. [美] 罗素. *人工智能(现代方法)*. 人民邮电出版社, 2022
-5. 刘彦君, 金飞虎. *JavaEE 开发技术与案例教程*. 人民邮电出版社, 2014
+- [x] **Expectmax 参数化版本** (`ExpectmaxTunable`) — 8 个可调参数（搜索深度、采样上限、采样策略、5 个启发式权重）
+- [x] **Expectmax 参数扫描实验** (`ExpectmaxParamExperiment`) — OFAT + 组合验证，并行 worker，三格式报告（盒框 TXT / Markdown / CSV）

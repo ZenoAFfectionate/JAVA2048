@@ -17,7 +17,7 @@ public class ExperimentRunner {
     private static PrintWriter out;  // 同时写入文件和终端
 
     // 实验规模
-    private static final int[] GAME_COUNTS = {10, 100, 1000, 10000};
+    private static final int[] GAME_COUNTS = {1, 10, 100, 1000};
 
     // 算法注册
     interface Algo {
@@ -70,15 +70,16 @@ public class ExperimentRunner {
 
     // ---- 单组实验 ----
 
+    /** MCTS 迭代次数（固定为 20，所有规模实验保持一致便于横向对比）。 */
+    private static final int MCTS_ITERATIONS = 20;
+
     static void runExperiment(int totalGames) {
         out.println("═══════════════════════════════════════════════");
         out.println("  Experiment: " + totalGames + " games per algorithm");
         out.println("═══════════════════════════════════════════════\n");
 
-        // 自适应 MCTS 迭代次数: 大规模实验时减少模拟次数
-        if (totalGames <= 100)      MCTS.setIterations(20);
-        else if (totalGames <= 1000) MCTS.setIterations(8);
-        else                        MCTS.setIterations(3);
+        // MCTS 迭代次数固定为 20，不随实验规模变化（公平对比）
+        MCTS.setIterations(MCTS_ITERATIONS);
         out.println("  MCTS iterations: " + MCTS.getIterations() + "\n");
 
         // 每个算法的统计
